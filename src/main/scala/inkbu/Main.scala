@@ -42,7 +42,7 @@ object Main extends App {
     val config = ch.config
 
     require(config.complete, "Config file %s not ready. Syntax: '<baseDir>;<buDir>;<latestCheck(yyyy-mm-dd)>'" format ch.configFile)
-    val bh: IBuHandler = BuHandler(config)
+    val bh: IBuHandler = BuHandler(config, debug)
 
     val baseDirStr = config.baseDir
     val latestCheck: Date = config.latestCheck
@@ -54,7 +54,7 @@ object Main extends App {
       val isNew = latestCheck.before(lastMod)
 
       if (isNew) {
-        if (debug) println("HANDLE: %10s %10s %s" format (sdf.format(latestCheck), sdf.format(lastMod), file))
+        if (debug) println("%10s %10s %s" format (sdf.format(latestCheck), sdf.format(lastMod), file))
         bh.copy(file)
         hcounter += 1L
       }
@@ -123,7 +123,7 @@ trait IBuHandler {
   def copy(f: File): Unit
 }
 
-case class BuHandler(config: Config) extends IBuHandler {
+case class BuHandler(config: Config, debug: Boolean) extends IBuHandler {
 
   val buDir = getCreateDir(config.buDir)
 
@@ -135,8 +135,11 @@ case class BuHandler(config: Config) extends IBuHandler {
   val buDirList: List[String] = splitFile(buDir)
 
   def splitFile(file: File): List[String] = {
+    def convertFileName(name: String): String =
+      if (name.isEmpty()) "/" else name
+    
     val parent = file.getParentFile
-    if (parent != null && !parent.getName.isEmpty()) splitFile(file.getParentFile) ::: List(file.getName)
+    if (parent != null) splitFile(file.getParentFile) ::: List(convertFileName(file.getName))
     else List(file.getName)
   }
 
@@ -152,13 +155,16 @@ case class BuHandler(config: Config) extends IBuHandler {
     dir
   }
 
-  def fileFromList(dir: File, fileList: List[String]): (File, String) = {
+  def fileFromList(dir: Option[File], fileList: List[String]): (File, String) = {
     fileList match {
       case Nil         => throw new IllegalStateException("File list must not be empty")
-      case name :: Nil => (dir, name)
+      case name :: Nil => (dir.getOrElse(throw new IllegalStateException("directory path must be defined when fileList is empty")), name)
       case path :: rest =>
-        val dir1 = new File(dir, path)
-        fileFromList(dir1, rest)
+        val dir1 = dir match {
+          case None => new File(path)
+          case Some(x) => new File(x, path)
+        }
+        fileFromList(Some(dir1), rest)
     }
   }
 
@@ -173,21 +179,16 @@ case class BuHandler(config: Config) extends IBuHandler {
     }
     val fromPath = FileSystems.getDefault.getPath(from.getParentFile.getAbsolutePath, from.getName)
     val toPath = FileSystems.getDefault.getPath(toDir.getAbsolutePath, fileName)
+    if (debug)
+      println("'%s' -> '%s'" format(fromPath, toPath))
     Files.copy(fromPath, toPath, StandardCopyOption.REPLACE_EXISTING);
-  }
-
-  def rootDir: File = {
-    val roots = File.listRoots()
-    require(roots.length > 0, "Filesystem has no root")
-    require(roots.length < 2, "Filesystems with more than one root directory are not yet supported")
-    roots(0)
   }
 
   def copy(f: File): Unit = {
     val fileList = splitFile(f)
     val relFileList = fileList diff baseDirList
     val toFileList = buDirList ::: relFileList
-    val (toDir, fileName) = fileFromList(rootDir, toFileList)
+    val (toDir, fileName) = fileFromList(None, toFileList)
     copy(f, toDir, fileName)
   }
 }
