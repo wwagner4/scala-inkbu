@@ -97,17 +97,17 @@ object Main extends App {
     }
 
     val r = new Runnable {
-      def run: Unit = println("handeled %d of %d" format (hcounter, counter))
+      def run: Unit = println("%d / %d" format (counter, hcounter))
     }
     val scheduler = Executors.newScheduledThreadPool(1);
     scheduler.scheduleAtFixedRate(r, 5, 5, TimeUnit.SECONDS);
 
     val baseDir = new File(baseDirStr)
-    require(baseDir.exists(), "Basedirectory '%s' does not exist" format baseDir)
+    require(baseDir.exists(), "base directory '%s' does not exist" format baseDir)
     require(baseDir.isDirectory())
 
     handleDirectory(baseDir, handleFile)
-    println("handeled %d of %d files since %s" format (hcounter, counter, sdf.format(latestCheck)))
+    println("%d files visited %d files copied since %s" format (counter, hcounter, sdf.format(latestCheck)))
     ch.defineCheckDateNow(Some(config))
     scheduler.shutdown()
   } catch {
