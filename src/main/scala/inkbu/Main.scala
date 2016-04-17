@@ -40,8 +40,9 @@ object Main extends App {
     val ch: IConfigHandler = ConfigHandler
 
     val config = ch.config
-
     require(config.complete, "Config file %s not ready. Syntax: '<baseDir>;<buDir>;<latestCheck(yyyy-mm-dd)>'" format ch.configFile)
+    println("backup from '%s' to '%s'" format (config.baseDir, config.buDir))
+    
     val bh: IBuHandler = BuHandler(config, debug)
 
     val baseDirStr = config.baseDir
@@ -97,7 +98,7 @@ object Main extends App {
     }
 
     val r = new Runnable {
-      def run: Unit = println("%d / %d" format (counter, hcounter))
+      def run: Unit = println("%d files visited %d files copied" format (counter, hcounter))
     }
     val scheduler = Executors.newScheduledThreadPool(1);
     scheduler.scheduleAtFixedRate(r, 5, 5, TimeUnit.SECONDS);
